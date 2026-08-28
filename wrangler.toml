@@ -1,10 +1,13 @@
 name = "podium"
+main = "worker.js"
 compatibility_date = "2024-11-01"
-pages_build_output_dir = "."
 
-# Base de datos de reservas. Crea la tuya con:
-#   npx wrangler d1 create podium-reservas
-# y pega aquí el database_id que te devuelva.
+# La web estática (HTML, CSS, imágenes). Todo lo que no sea /api/* sale de aquí.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Base de datos de reservas (D1).
 [[d1_databases]]
 binding = "DB"
 database_name = "podium-reservas"
