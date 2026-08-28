@@ -20,6 +20,9 @@
   --ancho: 1120px;
   --radio: 14px;
   --sombra: 0 18px 40px rgba(0, 0, 0, .45);
+
+  /* Grano fino: rompe los degradados planos y da textura de papel. */
+  --grano: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27160%27%20height%3D%27160%27%3E%3Cfilter%20id%3D%27g%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%27.85%27%20numOctaves%3D%273%27%20stitchTiles%3D%27stitch%27%2F%3E%3CfeColorMatrix%20type%3D%27saturate%27%20values%3D%270%27%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%27160%27%20height%3D%27160%27%20filter%3D%27url%28%23g%29%27%20opacity%3D%27.55%27%2F%3E%3C%2Fsvg%3E");
 }
 
 * { box-sizing: border-box; }
@@ -233,8 +236,9 @@ p { margin: 0 0 1em; }
   padding: 2.1rem 1.8rem 1.9rem;
 
   /* Luz cayendo desde arriba a la izquierda, como en una vitrina. */
-  background:
-    linear-gradient(158deg, #262119 0%, #1c1815 48%, #171412 100%);
+  background-image: var(--grano), linear-gradient(158deg, #262119 0%, #1c1815 48%, #171412 100%);
+  background-size: 160px 160px, auto;
+  background-blend-mode: soft-light, normal;
   border: 1px solid rgba(246, 241, 232, .09);
 
   /* Bisel interior claro arriba y sombra profunda debajo: da relieve. */
@@ -289,7 +293,9 @@ p { margin: 0 0 1em; }
   color: var(--crema);
   margin-bottom: .55rem;
 }
-.tarjeta p { color: var(--crema-tenue); font-size: .93rem; }
+/* El tamaño y el color se heredan en vez de imponerse con `.tarjeta p`, que
+   por especificidad machacaba a clases como .antetitulo o .menu-dia__precio. */
+.tarjeta { font-size: .93rem; color: var(--crema-tenue); }
 .tarjeta p:last-child { margin-bottom: 0; }
 
 /* El icono va dentro de un medallón con anillo y brillo propio. */
@@ -335,7 +341,9 @@ p { margin: 0 0 1em; }
 /* Menú del día */
 .menu-dia {
   border-color: rgba(214, 178, 94, .38);
-  background: linear-gradient(158deg, #2a2418 0%, #1e1a14 50%, #181512 100%);
+  background-image: var(--grano), linear-gradient(158deg, #2a2418 0%, #1e1a14 50%, #181512 100%);
+  background-size: 160px 160px, auto;
+  background-blend-mode: soft-light, normal;
 }
 .menu-dia::before { background: radial-gradient(60% 60% at 40% 50%, rgba(214, 178, 94, .28), transparent 70%); }
 .menu-dia::after { background: linear-gradient(90deg, transparent, rgba(214, 178, 94, .8), transparent); }
@@ -792,3 +800,17 @@ p { margin: 0 0 1em; }
   .tarjeta:hover, .turno:hover:not(:disabled) { transform: none; }
   * { scroll-behavior: auto !important; }
 }
+
+/* Grano general, apenas perceptible, para que los fondos planos no se vean digitales. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: var(--grano);
+  background-size: 160px 160px;
+  opacity: .035;
+  mix-blend-mode: overlay;
+}
+@media print { body::after { display: none; } }

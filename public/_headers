@@ -8,10 +8,10 @@
 # El CSS y el JS cambian a menudo: caché corta para no dejar a nadie con una
 # versión vieja durante días. Las fotos sí pueden cachearse largo.
 /assets/css/*
-  Cache-Control: public, max-age=300, must-revalidate
+  Cache-Control: no-cache
 
 /assets/js/*
-  Cache-Control: public, max-age=300, must-revalidate
+  Cache-Control: no-cache
 
 /assets/img/*
   Cache-Control: public, max-age=86400
