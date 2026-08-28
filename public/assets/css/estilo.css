@@ -227,27 +227,63 @@ p { margin: 0 0 1em; }
 
 .tarjeta {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
-  background: var(--carbon-3);
-  border: 1px solid var(--linea);
-  border-radius: var(--radio);
-  padding: 1.9rem 1.7rem;
+  border-radius: 16px;
+  padding: 2.1rem 1.8rem 1.9rem;
+
+  /* Luz cayendo desde arriba a la izquierda, como en una vitrina. */
+  background:
+    linear-gradient(158deg, #262119 0%, #1c1815 48%, #171412 100%);
+  border: 1px solid rgba(246, 241, 232, .09);
+
+  /* Bisel interior claro arriba y sombra profunda debajo: da relieve. */
+  box-shadow:
+    inset 0 1px 0 rgba(246, 241, 232, .07),
+    inset 0 -1px 0 rgba(0, 0, 0, .35),
+    0 22px 44px -26px rgba(0, 0, 0, .95);
+
+  transition: transform .45s cubic-bezier(.22, .61, .36, 1),
+              border-color .45s ease,
+              box-shadow .45s ease;
 }
-/* Filete superior que se dibuja al pasar por encima. */
+
+/* Halo cálido difuso en la esquina superior. */
 .tarjeta::before {
   content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--brasa), transparent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform .5s cubic-bezier(.22, .61, .36, 1);
+  position: absolute;
+  inset: -40% 30% 55% -25%;
+  z-index: -1;
+  background: radial-gradient(60% 60% at 40% 50%, rgba(224, 123, 35, .30), transparent 70%);
+  opacity: .55;
+  transition: opacity .5s ease, transform .5s ease;
 }
-.tarjeta:hover::before { transform: scaleX(1); }
+
+/* Filo iluminado en el borde superior. */
+.tarjeta::after {
+  content: '';
+  position: absolute; top: 0; left: 12%; right: 12%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(224, 123, 35, .75), transparent);
+  opacity: .5;
+  transition: opacity .45s ease, left .5s ease, right .5s ease;
+}
+
+.tarjeta:hover {
+  transform: translateY(-4px);
+  border-color: rgba(224, 123, 35, .34);
+  box-shadow:
+    inset 0 1px 0 rgba(246, 241, 232, .1),
+    inset 0 -1px 0 rgba(0, 0, 0, .35),
+    0 30px 56px -26px rgba(0, 0, 0, 1),
+    0 0 0 1px rgba(224, 123, 35, .08);
+}
+.tarjeta:hover::before { opacity: .95; transform: translate(6%, 4%); }
+.tarjeta:hover::after { opacity: 1; left: 0; right: 0; }
 
 .tarjeta h3 {
   font-family: var(--fuente-titulo);
   font-weight: 600;
-  font-size: 1.3rem;
+  font-size: 1.32rem;
   letter-spacing: 0;
   text-transform: none;
   color: var(--crema);
@@ -256,13 +292,34 @@ p { margin: 0 0 1em; }
 .tarjeta p { color: var(--crema-tenue); font-size: .93rem; }
 .tarjeta p:last-child { margin-bottom: 0; }
 
-.tarjeta__icono {
-  width: 34px; height: 34px;
-  color: var(--brasa);
-  margin-bottom: 1.2rem;
-  transition: transform .35s ease;
+/* El icono va dentro de un medallón con anillo y brillo propio. */
+.tarjeta__medallon {
+  position: relative;
+  width: 58px; height: 58px;
+  display: grid; place-items: center;
+  margin-bottom: 1.4rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(224, 123, 35, .30), rgba(224, 123, 35, .05) 62%, transparent 75%),
+    linear-gradient(160deg, rgba(246, 241, 232, .07), transparent 60%);
+  border: 1px solid rgba(224, 123, 35, .32);
+  box-shadow:
+    inset 0 1px 0 rgba(246, 241, 232, .12),
+    0 8px 20px -10px rgba(224, 123, 35, .55);
+  transition: transform .45s cubic-bezier(.22, .61, .36, 1), box-shadow .45s ease, border-color .45s ease;
 }
-.tarjeta:hover .tarjeta__icono { transform: translateY(-2px); }
+.tarjeta:hover .tarjeta__medallon {
+  transform: translateY(-3px) scale(1.04);
+  border-color: rgba(224, 123, 35, .6);
+  box-shadow:
+    inset 0 1px 0 rgba(246, 241, 232, .18),
+    0 12px 26px -10px rgba(224, 123, 35, .75);
+}
+
+.tarjeta__icono {
+  width: 27px; height: 27px;
+  color: var(--brasa-claro);
+}
 
 /* Destacados de portada */
 .destacado {
@@ -276,7 +333,13 @@ p { margin: 0 0 1em; }
 .destacado__precio { font-family: var(--fuente-titulo); font-size: 1.15rem; color: var(--brasa); white-space: nowrap; }
 
 /* Menú del día */
-.menu-dia { border: 1px solid rgba(214, 178, 94, .35); background: linear-gradient(180deg, rgba(214, 178, 94, .08), transparent); }
+.menu-dia {
+  border-color: rgba(214, 178, 94, .38);
+  background: linear-gradient(158deg, #2a2418 0%, #1e1a14 50%, #181512 100%);
+}
+.menu-dia::before { background: radial-gradient(60% 60% at 40% 50%, rgba(214, 178, 94, .28), transparent 70%); }
+.menu-dia::after { background: linear-gradient(90deg, transparent, rgba(214, 178, 94, .8), transparent); }
+.menu-dia:hover { border-color: rgba(214, 178, 94, .6); }
 .menu-dia__precio { font-family: var(--fuente-titulo); font-size: 3rem; color: var(--oro); line-height: 1; }
 .menu-dia ul { margin: .4rem 0 1.2rem; padding-left: 1.1rem; color: var(--crema-tenue); }
 .menu-dia h4 { font-size: .75rem; letter-spacing: .2em; color: var(--brasa); margin-bottom: .3rem; }
