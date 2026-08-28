@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS cierres (
   motivo TEXT
 );
 
+-- Aperturas extraordinarias: días que normalmente cerráis (los lunes) pero que
+-- ese día concreto sí abrís.
+CREATE TABLE IF NOT EXISTS aperturas (
+  fecha  TEXT PRIMARY KEY,
+  motivo TEXT
+);
+
 CREATE TABLE IF NOT EXISTS ajustes (
   clave TEXT PRIMARY KEY,
   valor TEXT NOT NULL

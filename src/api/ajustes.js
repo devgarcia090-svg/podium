@@ -20,8 +20,9 @@ export async function onRequestGet({ request, env }) {
   const hoy = globalThis.fechaISO(ahoraLocal());
   const hasta = globalThis.fechaISO(new Date(globalThis.aFecha(hoy).getTime() + DIAS_VISTA * 86400000));
 
-  const [cierres, ocupacion] = await Promise.all([
+  const [cierres, aperturas, ocupacion] = await Promise.all([
     env.DB.prepare('SELECT fecha, motivo FROM cierres WHERE fecha >= ? ORDER BY fecha').bind(hoy).all(),
+    env.DB.prepare('SELECT fecha, motivo FROM aperturas WHERE fecha >= ? ORDER BY fecha').bind(hoy).all(),
     env.DB.prepare(`SELECT fecha, COUNT(*) AS reservas, SUM(personas) AS comensales
                     FROM reservas
                     WHERE fecha >= ? AND fecha <= ? AND estado <> 'cancelada'
@@ -30,6 +31,7 @@ export async function onRequestGet({ request, env }) {
 
   const porFecha = Object.fromEntries((ocupacion.results || []).map((r) => [r.fecha, r]));
   const cerrados = new Set((cierres.results || []).map((c) => c.fecha));
+  const abiertos = new Set((aperturas.results || []).map((a) => a.fecha));
 
   const agenda = [];
   for (let i = 0; i < DIAS_VISTA; i++) {
@@ -38,7 +40,9 @@ export async function onRequestGet({ request, env }) {
     agenda.push({
       fecha,
       diaSemana: dia?.nombre || '',
-      abre: !dia?.cerrado,
+      cierreSemanal: Boolean(dia?.cerrado),
+      abre: !dia?.cerrado || abiertos.has(fecha),
+      aperturaExtra: abiertos.has(fecha),
       cerradoPuntual: cerrados.has(fecha),
       reservas: porFecha[fecha]?.reservas || 0,
       comensales: porFecha[fecha]?.comensales || 0
@@ -48,6 +52,7 @@ export async function onRequestGet({ request, env }) {
   return json({
     plazasPorTurno: await plazasPorTurno(env),
     cierres: cierres.results || [],
+    aperturas: aperturas.results || [],
     agenda
   });
 }
@@ -80,7 +85,7 @@ export async function onRequestPut({ request, env }) {
   return json({ ok: true, plazasPorTurno: plazas });
 }
 
-/** Añadir un día de cierre. */
+/** Añadir un día de cierre, o una apertura extraordinaria (`tipo: 'apertura'`). */
 export async function onRequestPost({ request, env }) {
   const sinBase = exigirBase(env);
   if (sinBase) return sinBase;
@@ -96,6 +101,17 @@ export async function onRequestPost({ request, env }) {
   }
 
   if (!esFechaISO(datos.fecha)) return fallo('Indica una fecha válida.');
+
+  // Abrir un día que normalmente está cerrado.
+  if (datos.tipo === 'apertura') {
+    await env.DB
+      .prepare('INSERT INTO aperturas (fecha, motivo) VALUES (?, ?) ON CONFLICT(fecha) DO UPDATE SET motivo = excluded.motivo')
+      .bind(datos.fecha, limpiar(datos.motivo, 120) || null)
+      .run();
+    // Si estaba marcado como cerrado puntual, esa marca ya no tiene sentido.
+    await env.DB.prepare('DELETE FROM cierres WHERE fecha = ?').bind(datos.fecha).run();
+    return json({ ok: true });
+  }
 
   // Cerrar un día con reservas dentro deja tirada a gente: avisamos y solo
   // seguimos si el personal lo confirma expresamente.
@@ -117,6 +133,7 @@ export async function onRequestPost({ request, env }) {
     .prepare('INSERT INTO cierres (fecha, motivo) VALUES (?, ?) ON CONFLICT(fecha) DO UPDATE SET motivo = excluded.motivo')
     .bind(datos.fecha, limpiar(datos.motivo, 120) || null)
     .run();
+  await env.DB.prepare('DELETE FROM aperturas WHERE fecha = ?').bind(datos.fecha).run();
 
   return json({ ok: true, reservasAfectadas: afectadas.n });
 }
@@ -129,9 +146,11 @@ export async function onRequestDelete({ request, env }) {
   const sinSesion = await exigirSesion(request, env);
   if (sinSesion) return sinSesion;
 
-  const fecha = new URL(request.url).searchParams.get('fecha');
+  const url = new URL(request.url);
+  const fecha = url.searchParams.get('fecha');
   if (!esFechaISO(fecha)) return fallo('Indica una fecha válida.');
 
-  await env.DB.prepare('DELETE FROM cierres WHERE fecha = ?').bind(fecha).run();
+  const tabla = url.searchParams.get('tipo') === 'apertura' ? 'aperturas' : 'cierres';
+  await env.DB.prepare(`DELETE FROM ${tabla} WHERE fecha = ?`).bind(fecha).run();
   return json({ ok: true });
 }

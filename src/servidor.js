@@ -120,6 +120,11 @@ export async function cierreDe(env, fecha) {
   return env.DB.prepare('SELECT fecha, motivo FROM cierres WHERE fecha = ?').bind(fecha).first();
 }
 
+/** Apertura extraordinaria: un día de cierre semanal en el que sí se abre. */
+export async function aperturaDe(env, fecha) {
+  return env.DB.prepare('SELECT fecha, motivo FROM aperturas WHERE fecha = ?').bind(fecha).first();
+}
+
 /**
  * Plazas ya ocupadas por turno en una fecha.
  * `excluir` deja fuera una reserva concreta, para que al editarla no cuente
@@ -146,9 +151,12 @@ export async function disponibilidadDe(env, fecha, { ignorarAntelacion = false, 
     return { cerrado: true, motivo: cierre.motivo || 'Cerrado ese día', turnos: [] };
   }
 
-  const turnos = globalThis.turnosDeFecha(fecha, ahoraLocal(), { ignorarAntelacion });
+  const dia = globalThis.diaDeHorario(globalThis.aFecha(fecha).getDay());
+  const apertura = dia?.cerrado ? await aperturaDe(env, fecha) : null;
+  const tramos = apertura ? REGLAS.tramosApertura : null;
+
+  const turnos = globalThis.turnosDeFecha(fecha, ahoraLocal(), { ignorarAntelacion, tramos });
   if (!turnos.length) {
-    const dia = globalThis.diaDeHorario(globalThis.aFecha(fecha).getDay());
     const motivo = dia?.cerrado
       ? `Los ${dia.nombre.toLowerCase()} cerramos.`
       : 'Ya no quedan turnos para ese día. Prueba con el siguiente.';

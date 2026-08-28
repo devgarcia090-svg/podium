@@ -226,14 +226,43 @@ p { margin: 0 0 1em; }
 .rejilla--3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 
 .tarjeta {
+  position: relative;
+  overflow: hidden;
   background: var(--carbon-3);
   border: 1px solid var(--linea);
   border-radius: var(--radio);
-  padding: 1.6rem;
+  padding: 1.9rem 1.7rem;
 }
-.tarjeta h3 { color: var(--crema); }
+/* Filete superior que se dibuja al pasar por encima. */
+.tarjeta::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--brasa), transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .5s cubic-bezier(.22, .61, .36, 1);
+}
+.tarjeta:hover::before { transform: scaleX(1); }
+
+.tarjeta h3 {
+  font-family: var(--fuente-titulo);
+  font-weight: 600;
+  font-size: 1.3rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--crema);
+  margin-bottom: .55rem;
+}
+.tarjeta p { color: var(--crema-tenue); font-size: .93rem; }
 .tarjeta p:last-child { margin-bottom: 0; }
-.tarjeta__icono { font-size: 1.6rem; margin-bottom: .8rem; }
+
+.tarjeta__icono {
+  width: 34px; height: 34px;
+  color: var(--brasa);
+  margin-bottom: 1.2rem;
+  transition: transform .35s ease;
+}
+.tarjeta:hover .tarjeta__icono { transform: translateY(-2px); }
 
 /* Destacados de portada */
 .destacado {
@@ -543,7 +572,14 @@ p { margin: 0 0 1em; }
 .estado-abierto[data-abierto='si']::before { background: var(--verde); box-shadow: 0 0 0 3px rgba(74, 157, 107, .2); }
 .estado-abierto[data-abierto='no'] { color: var(--gris); }
 
-.mapa { border: 0; width: 100%; height: 320px; border-radius: var(--radio); filter: grayscale(.4) contrast(1.05); }
+.mapa {
+  border: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 340px;
+  border-radius: var(--radio);
+  filter: grayscale(.35) contrast(1.05);
+}
 
 /* ---------- Impresión ---------- */
 
@@ -623,6 +659,11 @@ p { margin: 0 0 1em; }
 .dia--libre { border-color: rgba(74, 157, 107, .45); background: rgba(74, 157, 107, .08); }
 .dia--libre .dia__estado { color: #9fd7b6; }
 .dia--ocupado .dia__estado { color: var(--brasa-claro); }
+.dia--semanal, .dia--cerrado { opacity: .45; }
+.dia--semanal:hover, .dia--cerrado:hover { opacity: 1; border-color: var(--brasa); }
+.dia--cerrado { border-style: dashed; }
+.dia--extra { border-color: var(--oro); background: rgba(214, 178, 94, .1); }
+.dia--extra .dia__estado { color: var(--oro); }
 
 /* ---------- Turnos de comida y cena ---------- */
 
@@ -642,3 +683,49 @@ p { margin: 0 0 1em; }
 .turno-cabecera:first-child { margin-top: 0; }
 .turno-cabecera h3 { margin: 0; color: var(--crema); }
 .turno-cabecera__resumen { font-size: .82rem; color: var(--gris); }
+
+/* ---------- Animaciones ---------- */
+
+[data-anima] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .7s cubic-bezier(.22, .61, .36, 1), transform .7s cubic-bezier(.22, .61, .36, 1);
+  will-change: opacity, transform;
+}
+[data-anima].visible { opacity: 1; transform: none; }
+
+/* La foto de fondo de la portada respira despacio. */
+.hero__fondo { animation: acercar 26s ease-out forwards; }
+@keyframes acercar {
+  from { transform: scale(1.09); }
+  to   { transform: scale(1); }
+}
+
+/* La cabecera se aprieta un poco al bajar. */
+.cabecera { transition: padding .25s ease, background .25s ease, box-shadow .25s ease; }
+.cabecera--compacta {
+  background: rgba(18, 16, 14, .97);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
+}
+.cabecera--compacta .cabecera__fila { padding: .45rem 0; }
+.cabecera__fila { transition: padding .25s ease; }
+
+.tarjeta { transition: transform .3s ease, border-color .3s ease; }
+.tarjeta:hover { transform: translateY(-3px); border-color: rgba(224, 123, 35, .45); }
+
+.destacado { transition: padding-left .25s ease; }
+.destacado:hover { padding-left: .5rem; }
+.destacado:hover .destacado__precio { color: var(--brasa-claro); }
+
+.turno { transition: transform .12s ease, background .12s ease, border-color .12s ease; }
+.turno:hover:not(:disabled) { transform: translateY(-2px); }
+
+.insignia__valor { font-variant-numeric: tabular-nums; }
+
+/* Quien pida menos movimiento, no ve ninguno. */
+@media (prefers-reduced-motion: reduce) {
+  [data-anima] { opacity: 1; transform: none; transition: none; }
+  .hero__fondo { animation: none; }
+  .tarjeta:hover, .turno:hover:not(:disabled) { transform: none; }
+  * { scroll-behavior: auto !important; }
+}

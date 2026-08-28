@@ -63,9 +63,12 @@
    * `ignorarAntelacion` lo usa el panel: el personal sí puede mover una reserva
    * a una hora de hoy que ya no se ofrece al cliente.
    */
-  function turnosDeFecha(iso, ahora = new Date(), { ignorarAntelacion = false } = {}) {
+  function turnosDeFecha(iso, ahora = new Date(), { ignorarAntelacion = false, tramos = null } = {}) {
     const dia = diaDeHorario(aFecha(iso).getDay());
-    if (!dia || dia.cerrado) return [];
+    // `tramos` lo usa una apertura extraordinaria: ese día se abre aunque
+    // normalmente sea de cierre semanal.
+    const horarioDelDia = tramos || (dia && !dia.cerrado ? dia.tramos : null);
+    if (!horarioDelDia) return [];
 
     const { intervaloMinutos, minutosAntesCierre, antelacionMinutos } = P.reservas;
     const esHoy = !ignorarAntelacion && iso === fechaISO(ahora);
@@ -73,7 +76,7 @@
 
     const turnos = [];
     const vistos = new Set();
-    for (const tramo of dia.tramos) {
+    for (const tramo of horarioDelDia) {
       const [abre, cierra] = tramoEnMinutos(tramo);
       for (let t = abre; t <= cierra - minutosAntesCierre; t += intervaloMinutos) {
         if (esHoy && t < minimoHoy) continue;
@@ -89,10 +92,13 @@
   /** A qué turno (Comida / Cena) pertenece una hora de una fecha. */
   function turnoDeHora(iso, hora) {
     const dia = diaDeHorario(aFecha(iso).getDay());
-    if (!dia || dia.cerrado) return '';
+    // Si ese día es de cierre semanal pero hay reservas, es una apertura
+    // extraordinaria: se mira contra el horario de apertura.
+    const horarioDelDia = dia && !dia.cerrado ? dia.tramos : P.reservas.tramosApertura;
+    if (!horarioDelDia) return '';
 
     const minutos = aMinutos(hora);
-    for (const tramo of dia.tramos) {
+    for (const tramo of horarioDelDia) {
       const [abre, cierra] = tramoEnMinutos(tramo);
       const m = minutos < abre ? minutos + 1440 : minutos;
       if (m >= abre && m <= cierra) return tramo.turno;

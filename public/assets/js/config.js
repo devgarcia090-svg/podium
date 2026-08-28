@@ -50,6 +50,12 @@ globalThis.PODIUM = {
     maxComensales: 20,         // por encima de esto, que llamen por teléfono
     diasVistaMaximos: 60,      // hasta cuántos días vista se puede reservar
     antelacionMinutos: 60,     // margen mínimo desde ahora
-    plazasPorTurnoPorDefecto: 30
+    plazasPorTurnoPorDefecto: 30,
+
+    // Turnos que se aplican al abrir un día que normalmente está cerrado.
+    tramosApertura: [
+      { turno: 'Comida', abre: '13:00', cierra: '16:30' },
+      { turno: 'Cena', abre: '20:00', cierra: '00:00' }
+    ]
   }
 };

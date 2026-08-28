@@ -299,6 +299,16 @@ async function cargarAjustes() {
           </div>`).join('')
       : '<p class="tenue">No hay días cerrados programados.</p>';
 
+    if (datos.aperturas?.length) {
+      contenedorCierres.innerHTML += `
+        <p class="campo__ayuda" style="margin-top:1rem">Aperturas extraordinarias:</p>` +
+        datos.aperturas.map((a) => `
+          <div class="pie__horario" style="padding:.5rem 0;border-bottom:1px solid var(--linea)">
+            <span>${fechaLarga(a.fecha)}${a.motivo ? ` — <span class="tenue">${escapar(a.motivo)}</span>` : ''}</span>
+            <button class="boton boton--peligro boton--pequeno" data-quitar-apertura="${a.fecha}" type="button">Quitar</button>
+          </div>`).join('');
+    }
+
     pintarAgenda(datos.agenda || []);
   } catch (err) {
     avisar(errorPanel, err.message);
@@ -310,8 +320,7 @@ async function cargarAjustes() {
  * un día de descanso sin dejar tirado a nadie.
  */
 function pintarAgenda(agenda) {
-  const candidatos = agenda.filter((d) => d.abre && !d.cerradoPuntual);
-  const libres = candidatos.filter((d) => d.reservas === 0);
+  const libres = agenda.filter((d) => d.abre && !d.cerradoPuntual && d.reservas === 0);
 
   contenedorAgenda.innerHTML = `
     <p class="campo__ayuda" style="margin-top:0">
@@ -321,18 +330,63 @@ function pintarAgenda(agenda) {
         : 'Todos los días abiertos de las próximas 4 semanas tienen alguna reserva.'}
     </p>
     <div class="agenda">
-      ${candidatos.map((d) => `
-        <button class="dia ${d.reservas ? 'dia--ocupado' : 'dia--libre'}" type="button"
-                data-cerrar-dia="${d.fecha}"
-                title="${d.reservas ? `${d.reservas} reservas, ${d.comensales} comensales` : 'Sin reservas'}">
-          <span class="dia__fecha">${fechaCorta(d.fecha)}</span>
-          <span class="dia__estado">${d.reservas ? `${d.reservas} res. · ${d.comensales} pax` : 'libre'}</span>
-        </button>`).join('')}
+      ${agenda.map((d) => {
+        // Cierre semanal (los lunes): se puede abrir ese día concreto.
+        if (d.cierreSemanal && !d.aperturaExtra) {
+          return `<button class="dia dia--semanal" type="button" data-abrir-dia="${d.fecha}"
+                          title="Cerráis todos los ${d.diaSemana.toLowerCase()}. Pulsa para abrir este día.">
+                    <span class="dia__fecha">${fechaCorta(d.fecha)}</span>
+                    <span class="dia__estado">cerrado · abrir</span>
+                  </button>`;
+        }
+        if (d.cerradoPuntual) {
+          return `<button class="dia dia--cerrado" type="button" data-reabrir-dia="${d.fecha}"
+                          title="Día cerrado. Pulsa para volver a abrirlo.">
+                    <span class="dia__fecha">${fechaCorta(d.fecha)}</span>
+                    <span class="dia__estado">cerrado</span>
+                  </button>`;
+        }
+        const extra = d.aperturaExtra ? ' dia--extra' : '';
+        return `
+          <button class="dia ${d.reservas ? 'dia--ocupado' : 'dia--libre'}${extra}" type="button"
+                  data-cerrar-dia="${d.fecha}"
+                  title="${d.reservas ? `${d.reservas} reservas, ${d.comensales} comensales` : 'Sin reservas'}">
+            <span class="dia__fecha">${fechaCorta(d.fecha)}${d.aperturaExtra ? ' ·' : ''}</span>
+            <span class="dia__estado">${d.aperturaExtra ? 'abierto extra' : (d.reservas ? `${d.reservas} res. · ${d.comensales} pax` : 'libre')}</span>
+          </button>`;
+      }).join('')}
     </div>
-    <p class="campo__ayuda">Pulsa un día para cerrarlo. Los verdes no tienen reservas.</p>`;
+    <p class="campo__ayuda">
+      Verde: abierto y sin reservas, se puede cerrar.
+      Naranja: tiene reservas. Apagado: cerrado — púlsalo para abrir ese día,
+      por ejemplo un lunes de festivo.
+    </p>`;
 }
 
 contenedorAgenda.addEventListener('click', async (e) => {
+  // Abrir un día de cierre semanal, o reabrir uno cerrado puntualmente.
+  const abrir = e.target.closest('[data-abrir-dia]');
+  const reabrir = e.target.closest('[data-reabrir-dia]');
+
+  if (abrir || reabrir) {
+    const fecha = (abrir || reabrir).dataset.abrirDia || reabrir.dataset.reabrirDia;
+    try {
+      if (abrir) {
+        const motivo = prompt(`Abrir el ${fechaLarga(fecha)} de forma excepcional. ¿Motivo?`, 'Festivo');
+        if (motivo === null) return;
+        await api('/api/ajustes', { method: 'POST', cuerpo: { tipo: 'apertura', fecha, motivo } });
+        avisar(okAjustes, 'Día abierto. La web ya admite reservas ese día.');
+      } else {
+        await api(`/api/ajustes?fecha=${fecha}`, { method: 'DELETE' });
+        avisar(okAjustes, 'Día reabierto.');
+      }
+      cargarAjustes();
+    } catch (err) {
+      avisar(errorPanel, err.message);
+    }
+    return;
+  }
+
   const boton = e.target.closest('[data-cerrar-dia]');
   if (!boton) return;
 
@@ -392,10 +446,14 @@ document.querySelector('[data-anadir-cierre]').addEventListener('click', async (
 });
 
 contenedorCierres.addEventListener('click', async (e) => {
-  const boton = e.target.closest('[data-quitar]');
-  if (!boton) return;
+  const cierre = e.target.closest('[data-quitar]');
+  const apertura = e.target.closest('[data-quitar-apertura]');
+  if (!cierre && !apertura) return;
+
+  const fecha = cierre ? cierre.dataset.quitar : apertura.dataset.quitarApertura;
+  const tipo = apertura ? '&tipo=apertura' : '';
   try {
-    await api(`/api/ajustes?fecha=${boton.dataset.quitar}`, { method: 'DELETE' });
+    await api(`/api/ajustes?fecha=${fecha}${tipo}`, { method: 'DELETE' });
     cargarAjustes();
   } catch (err) {
     avisar(errorPanel, err.message);
