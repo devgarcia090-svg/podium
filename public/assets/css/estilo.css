@@ -814,3 +814,34 @@ body::after {
   mix-blend-mode: overlay;
 }
 @media print { body::after { display: none; } }
+
+/* ---------- Consentimiento y páginas legales ---------- */
+
+.consentimiento {
+  display: flex;
+  gap: .7rem;
+  align-items: flex-start;
+  margin: 0 0 1.4rem;
+  font-size: .86rem;
+  color: var(--crema-tenue);
+  line-height: 1.5;
+  cursor: pointer;
+}
+.consentimiento input {
+  flex: none;
+  width: 18px; height: 18px;
+  margin-top: .1rem;
+  accent-color: var(--brasa);
+  cursor: pointer;
+}
+
+.texto-legal { max-width: 72ch; }
+.texto-legal h1 { margin-bottom: 1.5rem; }
+.texto-legal h2 {
+  font-size: 1.25rem;
+  margin: 2.4rem 0 .7rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--linea);
+}
+.texto-legal p { color: var(--crema-tenue); }
+.texto-legal strong { color: var(--crema); }

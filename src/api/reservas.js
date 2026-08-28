@@ -26,6 +26,9 @@ export async function onRequestPost({ request, env }) {
   const hora = limpiar(datos.hora, 5);
   const personas = Number(datos.personas);
 
+  if (datos.consentimiento !== true) {
+    return fallo('Falta aceptar la política de privacidad.');
+  }
   if (nombre.length < 2) return fallo('Indícanos tu nombre.');
   if (!TELEFONO.test(telefono)) return fallo('El teléfono no parece válido.');
   if (email && !EMAIL.test(email)) return fallo('El correo no parece válido.');

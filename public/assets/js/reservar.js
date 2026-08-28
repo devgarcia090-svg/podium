@@ -149,7 +149,8 @@ function datosDelFormulario() {
     nombre: document.getElementById('nombre').value.trim(),
     telefono: document.getElementById('telefono').value.trim(),
     email: document.getElementById('email').value.trim(),
-    notas: document.getElementById('notas').value.trim()
+    notas: document.getElementById('notas').value.trim(),
+    consentimiento: document.getElementById('consentimiento').checked
   };
 }
 
@@ -214,6 +215,7 @@ form.addEventListener('submit', async (e) => {
   if (!datos.hora) return mostrarError('Elige una hora.');
   if (datos.nombre.length < 2) return mostrarError('Escribe tu nombre.');
   if (datos.telefono.replace(/\D/g, '').length < 6) return mostrarError('Escribe un teléfono de contacto válido.');
+  if (!datos.consentimiento) return mostrarError('Necesitamos que aceptes la política de privacidad para guardar la reserva.');
 
   if (modoWhatsapp) {
     enviarPorWhatsapp(datos);

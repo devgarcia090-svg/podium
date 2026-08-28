@@ -103,6 +103,15 @@ SESSION_SECRET=otracosa
 
 ---
 
+## Antes de abrir la web al público
+
+- **Rellenar los datos fiscales** marcados como `[COMPLETAR]` en
+  `public/aviso-legal.html` y `public/privacidad.html`: razón social, NIF y un
+  correo de contacto. Sin eso la web incumple la LSSI y el RGPD.
+- **Decidir el dominio definitivo** antes de imprimir el QR, o habrá que
+  reimprimirlo. Al cambiarlo, actualizar también `robots.txt`, `sitemap.xml` y
+  la etiqueta `canonical` de la portada.
+
 ## Pendiente de confirmar
 
 - **El horario** está tomado de Google y Restaurant Guru. Revísalo en

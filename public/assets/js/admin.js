@@ -278,6 +278,25 @@ document.querySelector('[data-semana]').addEventListener('click', () => {
 
 document.querySelector('[data-refrescar]').addEventListener('click', cargarReservas);
 
+/** Descarga las reservas a la vista en un fichero que abre Excel. */
+document.querySelector('[data-exportar]').addEventListener('click', () => {
+  if (!reservasEnPantalla.length) return avisar(errorPanel, 'No hay reservas que descargar.');
+
+  const columnas = ['fecha', 'hora', 'turno', 'personas', 'nombre', 'telefono', 'email', 'notas', 'estado', 'codigo'];
+  const escapaCampo = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+  const filas = reservasEnPantalla.map((r) =>
+    columnas.map((c) => escapaCampo(c === 'turno' ? turnoDeHora(r.fecha, r.hora) : r[c])).join(';'));
+
+  // El punto y coma y el BOM son lo que hace que Excel en español lo abra bien.
+  const csv = '\ufeff' + [columnas.join(';'), ...filas].join('\r\n');
+  const enlace = document.createElement('a');
+  enlace.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  enlace.download = `reservas-${rango.desde}${rango.hasta !== rango.desde ? '-a-' + rango.hasta : ''}.csv`;
+  enlace.click();
+  URL.revokeObjectURL(enlace.href);
+});
+
 // --- Ajustes ---
 
 const okAjustes = document.querySelector('[data-ajustes-ok]');

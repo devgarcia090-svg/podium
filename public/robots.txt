@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /qr
+
+Sitemap: https://podium.devgarcia090.workers.dev/sitemap.xml

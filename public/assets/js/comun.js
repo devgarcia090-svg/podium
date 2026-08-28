@@ -75,6 +75,8 @@ function pintarPie() {
             <li><a href="/carta">Ver la carta</a></li>
             <li><a href="/reservar">Reservar mesa</a></li>
             <li><a href="/qr">Código QR de la carta</a></li>
+            <li style="padding-top:.6rem"><a href="/aviso-legal">Aviso legal</a></li>
+            <li><a href="/privacidad">Privacidad</a></li>
           </ul>
         </div>
       </div>
