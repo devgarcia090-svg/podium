@@ -5,8 +5,13 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
 
+# El CSS y el JS cambian a menudo: caché corta para no dejar a nadie con una
+# versión vieja durante días. Las fotos sí pueden cachearse largo.
 /assets/*
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=300, must-revalidate
+
+/assets/img/*
+  Cache-Control: public, max-age=86400
 
 /api/*
   Cache-Control: no-store
