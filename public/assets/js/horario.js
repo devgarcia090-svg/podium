@@ -15,10 +15,10 @@
     return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
   };
 
-  const tramoEnMinutos = ([abre, cierra]) => {
-    const a = aMinutos(abre);
-    let c = aMinutos(cierra);
-    if (c <= a) c += 1440;
+  const tramoEnMinutos = (tramo) => {
+    const a = aMinutos(tramo.abre);
+    let c = aMinutos(tramo.cierra);
+    if (c <= a) c += 1440;   // cierra de madrugada
     return [a, c];
   };
 
@@ -27,7 +27,7 @@
   const textoTramos = (dia) =>
     dia.cerrado || !dia.tramos.length
       ? 'Cerrado'
-      : dia.tramos.map(([a, c]) => `${a} - ${c}`).join(' · ');
+      : dia.tramos.map((t) => `${t.abre} - ${t.cierra}`).join(' · ');
 
   const fechaISO = (fecha) =>
     `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
@@ -58,28 +58,50 @@
     return false;
   }
 
-  /** Turnos reservables de una fecha YYYY-MM-DD, según horario y antelación mínima. */
-  function turnosDeFecha(iso, ahora = new Date()) {
+  /**
+   * Turnos reservables de una fecha YYYY-MM-DD, según el horario del local.
+   * `ignorarAntelacion` lo usa el panel: el personal sí puede mover una reserva
+   * a una hora de hoy que ya no se ofrece al cliente.
+   */
+  function turnosDeFecha(iso, ahora = new Date(), { ignorarAntelacion = false } = {}) {
     const dia = diaDeHorario(aFecha(iso).getDay());
     if (!dia || dia.cerrado) return [];
 
     const { intervaloMinutos, minutosAntesCierre, antelacionMinutos } = P.reservas;
-    const esHoy = iso === fechaISO(ahora);
+    const esHoy = !ignorarAntelacion && iso === fechaISO(ahora);
     const minimoHoy = ahora.getHours() * 60 + ahora.getMinutes() + antelacionMinutos;
 
     const turnos = [];
+    const vistos = new Set();
     for (const tramo of dia.tramos) {
       const [abre, cierra] = tramoEnMinutos(tramo);
       for (let t = abre; t <= cierra - minutosAntesCierre; t += intervaloMinutos) {
         if (esHoy && t < minimoHoy) continue;
-        turnos.push(aHora(t));
+        const hora = aHora(t);
+        if (vistos.has(hora)) continue;
+        vistos.add(hora);
+        turnos.push({ hora, turno: tramo.turno });
       }
     }
-    return [...new Set(turnos)];
+    return turnos;
+  }
+
+  /** A qué turno (Comida / Cena) pertenece una hora de una fecha. */
+  function turnoDeHora(iso, hora) {
+    const dia = diaDeHorario(aFecha(iso).getDay());
+    if (!dia || dia.cerrado) return '';
+
+    const minutos = aMinutos(hora);
+    for (const tramo of dia.tramos) {
+      const [abre, cierra] = tramoEnMinutos(tramo);
+      const m = minutos < abre ? minutos + 1440 : minutos;
+      if (m >= abre && m <= cierra) return tramo.turno;
+    }
+    return '';
   }
 
   Object.assign(globalThis, {
     euros, aMinutos, aHora, tramoEnMinutos, diaDeHorario, textoTramos,
-    fechaISO, aFecha, fechaLarga, fechaCorta, estaAbierto, turnosDeFecha
+    fechaISO, aFecha, fechaLarga, fechaCorta, estaAbierto, turnosDeFecha, turnoDeHora
   });
 })();

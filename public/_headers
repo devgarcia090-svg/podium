@@ -11,6 +11,18 @@
 /api/*
   Cache-Control: no-store
 
+# Las direcciones son limpias (/admin, no /admin.html), así que hay que cubrir
+# las dos formas o el panel se queda sin noindex.
+/admin
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
 /admin.html
   X-Robots-Tag: noindex, nofollow
   Cache-Control: no-store
+
+/qr
+  X-Robots-Tag: noindex, nofollow
+
+/qr.html
+  X-Robots-Tag: noindex, nofollow

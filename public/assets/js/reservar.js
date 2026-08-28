@@ -63,13 +63,26 @@ function pintarTurnos(turnos, motivo) {
   }
 
   const personas = Number(campoPersonas.value);
-  contenedorTurnos.innerHTML = turnos
-    .map((t) => {
-      const cabe = t.libres === null || t.libres >= personas;
-      return `<button type="button" class="turno" data-hora="${t.hora}" aria-pressed="false"
-                ${cabe ? '' : 'disabled title="Completo para ese número de personas"'}>${t.hora}</button>`;
-    })
-    .join('');
+
+  // Se agrupan por servicio para que se vea claro qué es comida y qué es cena.
+  const porTurno = new Map();
+  for (const t of turnos) {
+    const nombre = t.turno || 'Horario';
+    if (!porTurno.has(nombre)) porTurno.set(nombre, []);
+    porTurno.get(nombre).push(t);
+  }
+
+  contenedorTurnos.innerHTML = [...porTurno].map(([nombre, lista]) => `
+    <div class="servicio">
+      <p class="servicio__nombre">${nombre}</p>
+      <div class="turnos">
+        ${lista.map((t) => {
+          const cabe = t.libres === null || t.libres >= personas;
+          return `<button type="button" class="turno" data-hora="${t.hora}" aria-pressed="false"
+                    ${cabe ? '' : 'disabled title="Completo para ese número de personas"'}>${t.hora}</button>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
 
   const libres = contenedorTurnos.querySelectorAll('.turno:not(:disabled)').length;
   mensajeTurnos.textContent = libres
@@ -118,7 +131,7 @@ async function cargarTurnos({ avanzarSiVacio = false } = {}) {
     // horario del local y la reserva se envía por WhatsApp.
     modoWhatsapp = true;
     botonEnviar.textContent = 'Enviar reserva por WhatsApp';
-    pintarTurnos(turnosDeFecha(fecha).map((hora) => ({ hora, libres: null })));
+    pintarTurnos(turnosDeFecha(fecha).map((t) => ({ ...t, libres: null })));
   }
 }
 

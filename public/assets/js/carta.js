@@ -70,7 +70,6 @@ function pintarPrecios(plato) {
 contenedor.innerHTML = window.CARTA.map((cat) => `
   <section class="grupo" id="${cat.id}">
     <div class="grupo__titulo">
-      <span aria-hidden="true">${cat.icono}</span>
       <h2>${escapar(cat.nombre)}</h2>
     </div>
     ${cat.nota ? `<p class="grupo__nota">${escapar(cat.nota)}</p>` : ''}
@@ -103,7 +102,7 @@ document.querySelector('[data-leyenda]').innerHTML = Object.entries(ALERGENOS)
   .map(([clave, info]) => `
     <div class="leyenda__fila">
       <span class="alergeno">${SIGLAS[clave] || clave}</span>
-      <span>${info.icono} ${info.nombre}</span>
+      <span>${info.nombre}</span>
     </div>`).join('');
 
 const md = window.MENU_DIARIO;

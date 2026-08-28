@@ -87,10 +87,11 @@ function tarjetaReserva(r) {
           <a href="tel:${telefono.replace(/\s/g, '')}">${telefono}</a>
           ${r.email ? ' · ' + escapar(r.email) : ''} · <span class="tenue">${escapar(r.codigo)}</span>
         </p>
-        ${r.notas ? `<p class="reserva__nota">📝 ${escapar(r.notas)}</p>` : ''}
+        ${r.notas ? `<p class="reserva__nota">${escapar(r.notas)}</p>` : ''}
       </div>
       <div class="reserva__acciones">
         ${r.estado !== 'confirmada' ? '<button class="boton boton--pequeno" data-accion="confirmada" type="button">Confirmar</button>' : ''}
+        <button class="boton boton--fantasma boton--pequeno" data-editar type="button">Cambiar</button>
         ${r.estado !== 'cancelada'
           ? '<button class="boton boton--peligro boton--pequeno" data-accion="cancelada" type="button">Cancelar</button>'
           : '<button class="boton boton--fantasma boton--pequeno" data-accion="pendiente" type="button">Recuperar</button>'}
@@ -98,10 +99,35 @@ function tarjetaReserva(r) {
     </article>`;
 }
 
+let reservasEnPantalla = [];
+
+/** Agrupa las reservas por día y servicio (comida / cena). */
+function pintarPorTurno(reservas) {
+  const grupos = new Map();
+  for (const r of reservas) {
+    const turno = turnoDeHora(r.fecha, r.hora) || 'Otros';
+    const clave = `${r.fecha}|${turno}`;
+    if (!grupos.has(clave)) grupos.set(clave, { fecha: r.fecha, turno, reservas: [] });
+    grupos.get(clave).reservas.push(r);
+  }
+
+  return [...grupos.values()].map((g) => {
+    const activas = g.reservas.filter((r) => r.estado !== 'cancelada');
+    const pax = activas.reduce((s, r) => s + r.personas, 0);
+    return `
+      <div class="turno-cabecera">
+        <h3>${g.turno} · <span class="tenue">${fechaCorta(g.fecha)}</span></h3>
+        <span class="turno-cabecera__resumen">${activas.length} reservas · ${pax} comensales</span>
+      </div>
+      ${g.reservas.map(tarjetaReserva).join('')}`;
+  }).join('');
+}
+
 async function cargarReservas() {
   lista.innerHTML = '<p class="tenue">Cargando…</p>';
   try {
     const { reservas } = await api(`/api/reservas?desde=${rango.desde}&hasta=${rango.hasta}`);
+    reservasEnPantalla = reservas;
     pintarMetricas(reservas);
 
     subtitulo.textContent = rango.desde === rango.hasta
@@ -109,13 +135,111 @@ async function cargarReservas() {
       : `Del ${fechaCorta(rango.desde)} al ${fechaCorta(rango.hasta)}`;
 
     lista.innerHTML = reservas.length
-      ? reservas.map(tarjetaReserva).join('')
+      ? pintarPorTurno(reservas)
       : '<p class="tenue" style="padding:2rem 0">No hay reservas en estas fechas.</p>';
   } catch (err) {
     lista.innerHTML = '';
     avisar(errorPanel, err.message, 0);
   }
 }
+
+// --- Cambiar fecha, hora o comensales ---
+
+async function abrirEdicion(tarjeta) {
+  if (tarjeta.querySelector('[data-form-editar]')) return;
+
+  const r = reservasEnPantalla.find((x) => x.id === tarjeta.dataset.id);
+  if (!r) return;
+
+  const form = document.createElement('form');
+  form.className = 'editor';
+  form.setAttribute('data-form-editar', '');
+  form.innerHTML = `
+    <div class="fila-campos">
+      <div class="campo">
+        <label>Día</label>
+        <input type="date" name="fecha" value="${r.fecha}" required>
+      </div>
+      <div class="campo">
+        <label>Hora</label>
+        <select name="hora" required><option>${escapar(r.hora)}</option></select>
+      </div>
+      <div class="campo">
+        <label>Comensales</label>
+        <input type="number" name="personas" min="1" max="99" value="${r.personas}" required>
+      </div>
+    </div>
+    <div class="campo">
+      <label>Notas</label>
+      <input type="text" name="notas" maxlength="300" value="${escapar(r.notas || '')}">
+    </div>
+    <div class="editor__acciones">
+      <button class="boton boton--pequeno" type="submit">Guardar cambios</button>
+      <button class="boton boton--fantasma boton--pequeno" type="button" data-cerrar>Cancelar</button>
+      <span class="editor__aviso" data-editor-aviso></span>
+    </div>`;
+  tarjeta.appendChild(form);
+
+  const campoFecha = form.elements.fecha;
+  const campoHora = form.elements.hora;
+  const aviso = form.querySelector('[data-editor-aviso]');
+
+  async function cargarHoras() {
+    campoHora.innerHTML = '<option>Cargando…</option>';
+    try {
+      const d = await api(`/api/disponibilidad?panel=1&fecha=${campoFecha.value}&excluir=${r.id}`);
+      if (!d.turnos.length) {
+        campoHora.innerHTML = '<option value="">Ese día no abrís</option>';
+        aviso.textContent = d.motivo || '';
+        return;
+      }
+      campoHora.innerHTML = d.turnos
+        .map((t) => `<option value="${t.hora}"${t.hora === r.hora ? ' selected' : ''}>${t.turno || ''} ${t.hora} · ${t.libres} libres</option>`)
+        .join('');
+      aviso.textContent = d.cierre ? `Ojo: ese día está marcado como cerrado (${d.cierre}).` : '';
+    } catch (err) {
+      campoHora.innerHTML = '<option value="">Error</option>';
+      aviso.textContent = err.message;
+    }
+  }
+
+  campoFecha.addEventListener('change', cargarHoras);
+  form.querySelector('[data-cerrar]').addEventListener('click', () => form.remove());
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const elegido = campoHora.selectedOptions[0];
+    const libres = Number((elegido?.textContent.match(/(\d+) libres/) || [])[1] ?? Infinity);
+    const personas = Number(form.elements.personas.value);
+
+    if (libres < personas &&
+        !confirm(`En ese turno solo quedan ${libres} plazas y la reserva es de ${personas}. ¿Lo pones igualmente?`)) {
+      return;
+    }
+
+    try {
+      await api(`/api/reservas/${r.id}`, {
+        method: 'PATCH',
+        cuerpo: {
+          fecha: campoFecha.value,
+          hora: campoHora.value,
+          personas,
+          notas: form.elements.notas.value
+        }
+      });
+      await cargarReservas();
+    } catch (err) {
+      aviso.textContent = err.message;
+    }
+  });
+
+  cargarHoras();
+}
+
+lista.addEventListener('click', (e) => {
+  const tarjeta = e.target.closest('.reserva');
+  if (e.target.closest('[data-editar]') && tarjeta) abrirEdicion(tarjeta);
+});
 
 lista.addEventListener('click', async (e) => {
   const boton = e.target.closest('[data-accion]');
@@ -160,6 +284,8 @@ const okAjustes = document.querySelector('[data-ajustes-ok]');
 const campoPlazas = document.getElementById('plazas');
 const contenedorCierres = document.querySelector('[data-cierres]');
 
+const contenedorAgenda = document.querySelector('[data-agenda]');
+
 async function cargarAjustes() {
   try {
     const datos = await api('/api/ajustes');
@@ -172,10 +298,65 @@ async function cargarAjustes() {
             <button class="boton boton--peligro boton--pequeno" data-quitar="${c.fecha}" type="button">Quitar</button>
           </div>`).join('')
       : '<p class="tenue">No hay días cerrados programados.</p>';
+
+    pintarAgenda(datos.agenda || []);
   } catch (err) {
     avisar(errorPanel, err.message);
   }
 }
+
+/**
+ * Agenda de los próximos días con las reservas de cada uno, para poder elegir
+ * un día de descanso sin dejar tirado a nadie.
+ */
+function pintarAgenda(agenda) {
+  const candidatos = agenda.filter((d) => d.abre && !d.cerradoPuntual);
+  const libres = candidatos.filter((d) => d.reservas === 0);
+
+  contenedorAgenda.innerHTML = `
+    <p class="campo__ayuda" style="margin-top:0">
+      ${libres.length
+        ? `Hay <strong>${libres.length}</strong> días abiertos sin ninguna reserva en las próximas 4 semanas.
+           Cerrar uno de esos no afecta a nadie.`
+        : 'Todos los días abiertos de las próximas 4 semanas tienen alguna reserva.'}
+    </p>
+    <div class="agenda">
+      ${candidatos.map((d) => `
+        <button class="dia ${d.reservas ? 'dia--ocupado' : 'dia--libre'}" type="button"
+                data-cerrar-dia="${d.fecha}"
+                title="${d.reservas ? `${d.reservas} reservas, ${d.comensales} comensales` : 'Sin reservas'}">
+          <span class="dia__fecha">${fechaCorta(d.fecha)}</span>
+          <span class="dia__estado">${d.reservas ? `${d.reservas} res. · ${d.comensales} pax` : 'libre'}</span>
+        </button>`).join('')}
+    </div>
+    <p class="campo__ayuda">Pulsa un día para cerrarlo. Los verdes no tienen reservas.</p>`;
+}
+
+contenedorAgenda.addEventListener('click', async (e) => {
+  const boton = e.target.closest('[data-cerrar-dia]');
+  if (!boton) return;
+
+  const fecha = boton.dataset.cerrarDia;
+  const motivo = prompt(`Cerrar el ${fechaLarga(fecha)}. ¿Motivo?`, 'Día de descanso');
+  if (motivo === null) return;
+
+  try {
+    let r = await api('/api/ajustes', { method: 'POST', cuerpo: { fecha, motivo } });
+
+    if (r.requiereConfirmacion) {
+      const seguir = confirm(
+        `Ese día tiene ${r.reservas} reserva(s) con ${r.comensales} comensales.\n\n` +
+        'Si lo cierras seguirán en la lista y tendrás que avisarles tú por teléfono.\n\n¿Cerrar igualmente?');
+      if (!seguir) return;
+      r = await api('/api/ajustes', { method: 'POST', cuerpo: { fecha, motivo, confirmado: true } });
+    }
+
+    avisar(okAjustes, 'Día cerrado. La web ya no admite reservas ese día.');
+    cargarAjustes();
+  } catch (err) {
+    avisar(errorPanel, err.message);
+  }
+});
 
 document.querySelector('[data-guardar-plazas]').addEventListener('click', async () => {
   try {
@@ -190,11 +371,18 @@ document.querySelector('[data-anadir-cierre]').addEventListener('click', async (
   const fecha = document.getElementById('cierre-fecha').value;
   if (!fecha) return avisar(errorPanel, 'Elige la fecha que quieres cerrar.');
 
+  const motivo = document.getElementById('cierre-motivo').value;
   try {
-    await api('/api/ajustes', {
-      method: 'POST',
-      cuerpo: { fecha, motivo: document.getElementById('cierre-motivo').value }
-    });
+    let r = await api('/api/ajustes', { method: 'POST', cuerpo: { fecha, motivo } });
+
+    if (r.requiereConfirmacion) {
+      const seguir = confirm(
+        `Ese día tiene ${r.reservas} reserva(s) con ${r.comensales} comensales.\n\n` +
+        'Si lo cierras seguirán en la lista y tendrás que avisarles tú por teléfono.\n\n¿Cerrar igualmente?');
+      if (!seguir) return;
+      await api('/api/ajustes', { method: 'POST', cuerpo: { fecha, motivo, confirmado: true } });
+    }
+
     document.getElementById('cierre-motivo').value = '';
     avisar(okAjustes, 'Día cerrado añadido.');
     cargarAjustes();

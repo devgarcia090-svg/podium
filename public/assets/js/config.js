@@ -14,15 +14,34 @@ globalThis.PODIUM = {
   facebook: 'https://www.facebook.com/podium.cafeteria/',
 
   // Horario de apertura. dia: 0 = domingo ... 6 = sábado.
-  // Un cierre igual o anterior a la apertura se entiende como madrugada del día siguiente.
+  // Cada tramo es un turno de servicio: solo se ofrecen reservas dentro de
+  // ellos, así no aparecen las horas muertas de la tarde.
+  // Un cierre igual o anterior a la apertura se entiende como madrugada.
   horario: [
     { dia: 1, nombre: 'Lunes', cerrado: true, tramos: [] },
-    { dia: 2, nombre: 'Martes', tramos: [['13:00', '17:00'], ['19:30', '00:00']] },
-    { dia: 3, nombre: 'Miércoles', tramos: [['13:00', '17:00'], ['20:00', '00:00']] },
-    { dia: 4, nombre: 'Jueves', tramos: [['13:00', '17:00'], ['19:30', '00:00']] },
-    { dia: 5, nombre: 'Viernes', tramos: [['13:00', '01:00']] },
-    { dia: 6, nombre: 'Sábado', tramos: [['13:00', '01:00']] },
-    { dia: 0, nombre: 'Domingo', tramos: [['13:00', '18:00']] }
+    { dia: 2, nombre: 'Martes', tramos: [
+      { turno: 'Comida', abre: '13:00', cierra: '16:30' },
+      { turno: 'Cena', abre: '20:00', cierra: '00:00' }
+    ] },
+    { dia: 3, nombre: 'Miércoles', tramos: [
+      { turno: 'Comida', abre: '13:00', cierra: '16:30' },
+      { turno: 'Cena', abre: '20:00', cierra: '00:00' }
+    ] },
+    { dia: 4, nombre: 'Jueves', tramos: [
+      { turno: 'Comida', abre: '13:00', cierra: '16:30' },
+      { turno: 'Cena', abre: '20:00', cierra: '00:00' }
+    ] },
+    { dia: 5, nombre: 'Viernes', tramos: [
+      { turno: 'Comida', abre: '13:00', cierra: '16:30' },
+      { turno: 'Cena', abre: '20:00', cierra: '01:00' }
+    ] },
+    { dia: 6, nombre: 'Sábado', tramos: [
+      { turno: 'Comida', abre: '13:00', cierra: '16:30' },
+      { turno: 'Cena', abre: '20:00', cierra: '01:00' }
+    ] },
+    { dia: 0, nombre: 'Domingo', tramos: [
+      { turno: 'Comida', abre: '13:00', cierra: '17:00' }
+    ] }
   ],
 
   reservas: {

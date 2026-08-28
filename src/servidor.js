@@ -120,11 +120,17 @@ export async function cierreDe(env, fecha) {
   return env.DB.prepare('SELECT fecha, motivo FROM cierres WHERE fecha = ?').bind(fecha).first();
 }
 
-/** Plazas ya ocupadas por turno en una fecha. */
-export async function ocupacionDe(env, fecha) {
+/**
+ * Plazas ya ocupadas por turno en una fecha.
+ * `excluir` deja fuera una reserva concreta, para que al editarla no cuente
+ * contra sí misma.
+ */
+export async function ocupacionDe(env, fecha, excluir = null) {
   const { results } = await env.DB
-    .prepare("SELECT hora, SUM(personas) AS total FROM reservas WHERE fecha = ? AND estado <> 'cancelada' GROUP BY hora")
-    .bind(fecha)
+    .prepare(`SELECT hora, SUM(personas) AS total FROM reservas
+              WHERE fecha = ? AND estado <> 'cancelada' AND id IS NOT ?
+              GROUP BY hora`)
+    .bind(fecha, excluir)
     .all();
 
   return Object.fromEntries((results || []).map((r) => [r.hora, Number(r.total)]));
@@ -134,11 +140,13 @@ export async function ocupacionDe(env, fecha) {
  * Turnos de una fecha con las plazas que quedan libres en cada uno.
  * Es la única fuente de verdad: la usan tanto el listado como el alta.
  */
-export async function disponibilidadDe(env, fecha) {
+export async function disponibilidadDe(env, fecha, { ignorarAntelacion = false, excluir = null } = {}) {
   const cierre = await cierreDe(env, fecha);
-  if (cierre) return { cerrado: true, motivo: cierre.motivo || 'Cerrado ese día', turnos: [] };
+  if (cierre && !ignorarAntelacion) {
+    return { cerrado: true, motivo: cierre.motivo || 'Cerrado ese día', turnos: [] };
+  }
 
-  const turnos = globalThis.turnosDeFecha(fecha, ahoraLocal());
+  const turnos = globalThis.turnosDeFecha(fecha, ahoraLocal(), { ignorarAntelacion });
   if (!turnos.length) {
     const dia = globalThis.diaDeHorario(globalThis.aFecha(fecha).getDay());
     const motivo = dia?.cerrado
@@ -148,11 +156,12 @@ export async function disponibilidadDe(env, fecha) {
   }
 
   const plazas = await plazasPorTurno(env);
-  const ocupacion = await ocupacionDe(env, fecha);
+  const ocupacion = await ocupacionDe(env, fecha, excluir);
 
   return {
     cerrado: false,
-    turnos: turnos.map((hora) => ({ hora, libres: Math.max(0, plazas - (ocupacion[hora] || 0)) }))
+    cierre: cierre ? (cierre.motivo || 'Día cerrado') : null,
+    turnos: turnos.map((t) => ({ ...t, libres: Math.max(0, plazas - (ocupacion[t.hora] || 0)) }))
   };
 }
 

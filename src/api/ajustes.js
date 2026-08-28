@@ -1,6 +1,15 @@
-import { json, fallo, esFechaISO, exigirSesion, exigirBase, plazasPorTurno, limpiar } from '../servidor.js';
+import {
+  json, fallo, esFechaISO, exigirSesion, exigirBase, plazasPorTurno, limpiar, ahoraLocal
+} from '../servidor.js';
 
-/** Aforo por turno y días de cierre puntual (vacaciones, festivos, privados). */
+const DIAS_VISTA = 28;
+
+/**
+ * Aforo por turno, días de cierre puntual y agenda de los próximos días.
+ *
+ * La agenda incluye cuántas reservas tiene cada día, que es lo que hace falta
+ * para elegir un día de descanso sin dejar tirado a nadie.
+ */
 export async function onRequestGet({ request, env }) {
   const sinBase = exigirBase(env);
   if (sinBase) return sinBase;
@@ -8,12 +17,39 @@ export async function onRequestGet({ request, env }) {
   const sinSesion = await exigirSesion(request, env);
   if (sinSesion) return sinSesion;
 
-  const { results } = await env.DB
-    .prepare('SELECT fecha, motivo FROM cierres WHERE fecha >= date(?) ORDER BY fecha')
-    .bind(new Date().toISOString().slice(0, 10))
-    .all();
+  const hoy = globalThis.fechaISO(ahoraLocal());
+  const hasta = globalThis.fechaISO(new Date(globalThis.aFecha(hoy).getTime() + DIAS_VISTA * 86400000));
 
-  return json({ plazasPorTurno: await plazasPorTurno(env), cierres: results || [] });
+  const [cierres, ocupacion] = await Promise.all([
+    env.DB.prepare('SELECT fecha, motivo FROM cierres WHERE fecha >= ? ORDER BY fecha').bind(hoy).all(),
+    env.DB.prepare(`SELECT fecha, COUNT(*) AS reservas, SUM(personas) AS comensales
+                    FROM reservas
+                    WHERE fecha >= ? AND fecha <= ? AND estado <> 'cancelada'
+                    GROUP BY fecha`).bind(hoy, hasta).all()
+  ]);
+
+  const porFecha = Object.fromEntries((ocupacion.results || []).map((r) => [r.fecha, r]));
+  const cerrados = new Set((cierres.results || []).map((c) => c.fecha));
+
+  const agenda = [];
+  for (let i = 0; i < DIAS_VISTA; i++) {
+    const fecha = globalThis.fechaISO(new Date(globalThis.aFecha(hoy).getTime() + i * 86400000));
+    const dia = globalThis.diaDeHorario(globalThis.aFecha(fecha).getDay());
+    agenda.push({
+      fecha,
+      diaSemana: dia?.nombre || '',
+      abre: !dia?.cerrado,
+      cerradoPuntual: cerrados.has(fecha),
+      reservas: porFecha[fecha]?.reservas || 0,
+      comensales: porFecha[fecha]?.comensales || 0
+    });
+  }
+
+  return json({
+    plazasPorTurno: await plazasPorTurno(env),
+    cierres: cierres.results || [],
+    agenda
+  });
 }
 
 /** Guardar el aforo por turno. */
@@ -61,12 +97,28 @@ export async function onRequestPost({ request, env }) {
 
   if (!esFechaISO(datos.fecha)) return fallo('Indica una fecha válida.');
 
+  // Cerrar un día con reservas dentro deja tirada a gente: avisamos y solo
+  // seguimos si el personal lo confirma expresamente.
+  const afectadas = await env.DB
+    .prepare("SELECT COUNT(*) AS n, SUM(personas) AS personas FROM reservas WHERE fecha = ? AND estado <> 'cancelada'")
+    .bind(datos.fecha)
+    .first();
+
+  if (afectadas.n > 0 && !datos.confirmado) {
+    return json({
+      ok: false,
+      requiereConfirmacion: true,
+      reservas: afectadas.n,
+      comensales: afectadas.personas || 0
+    });
+  }
+
   await env.DB
     .prepare('INSERT INTO cierres (fecha, motivo) VALUES (?, ?) ON CONFLICT(fecha) DO UPDATE SET motivo = excluded.motivo')
     .bind(datos.fecha, limpiar(datos.motivo, 120) || null)
     .run();
 
-  return json({ ok: true });
+  return json({ ok: true, reservasAfectadas: afectadas.n });
 }
 
 /** Quitar un día de cierre. */
